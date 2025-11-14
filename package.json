@@ -1,0 +1,21 @@
+{
+  "name": "jason",
+  "version": "1.0.0",
+  "description": "A lightweight library for JSON-driven progressive enhancement, similar to htmx but for JSON APIs.",
+  "keywords": [
+    "json",
+    "htmx",
+    "frontend",
+    "template"
+  ],
+  "homepage": "https://github.com/h-jangra/jason#readme",
+  "bugs": {
+    "url": "https://github.com/h-jangra/jason/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/h-jangra/jason.git"
+  },
+  "license": "MIT",
+  "author": "h-jangra"
+}
