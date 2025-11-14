@@ -1,21 +1,39 @@
 {
-  "name": "jason",
+  "name": "jx",
   "version": "1.0.0",
   "description": "A lightweight library for JSON-driven progressive enhancement, similar to htmx but for JSON APIs.",
   "keywords": [
     "json",
+    "jx",
     "htmx",
     "frontend",
     "template"
   ],
-  "homepage": "https://github.com/h-jangra/jason#readme",
+  "homepage": "https://github.com/h-jangra/jx#readme",
   "bugs": {
-    "url": "https://github.com/h-jangra/jason/issues"
+    "url": "https://github.com/h-jangra/jx/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/h-jangra/jason.git"
+    "url": "git+https://github.com/h-jangra/jx.git"
   },
   "license": "MIT",
-  "author": "h-jangra"
+  "author": "h-jangra",
+  "type": "module",
+  "main": "./dist/jx.min.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:min": "vite build --config vite.config.js"
+  },
+  "devDependencies": {
+    "vite": "^7.2.2"
+  },
+  "dependencies": {
+    "terser": "^5.44.1"
+  }
 }
