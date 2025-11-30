@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>JX Test</title>
+  </head>
+  <body>
+    <template id="user-template">
+      <div style="border:1px solid #ccc; padding:10px; margin:5px;">
+        <h3>{{name}}</h3>
+        <p>Age: {{age}}, Email: {{email}}</p>
+      </div>
+    </template>
+
+    <template id="users-template">
+      <div jx-each="." style="border:1px solid blue; padding:10px; margin:5px;">
+        <h4>{{name}}</h4>
+        <p>Email: {{email}}, Phone: {{phone}}</p>
+        <p>Company: {{company.name}}</p>
+      </div>
+    </template>
+
+    <button onclick="JX.json('user-template', '#output', {name: 'John', age: 25, email: 'john@test.com'})">
+      Test Single Item
+    </button>
+
+    <button id="loadBtn">
+      Test API Fetch (Array)
+    </button>
+
+    <button id="loadCachedBtn">
+      Load Cached Data
+    </button>
+
+    <button onclick="clearCache()">
+      Clear Cache
+    </button>
+
+    <button onclick="testLoop()">
+      Test Loop with Static Data
+    </button>
+
+    <div id="output" style="margin-top:20px; padding:10px; border:1px dashed #999;"></div>
+
+    <script src="src/jx.js"></script>
+    <script>
+      // Bind the load button with save functionality
+      JX.bind("#loadBtn", {
+        url: "https://jsonplaceholder.typicode.com/users",
+        target: "#output",
+        template: "users-template",
+        save: "cachedData"  // This will save to localStorage
+      });
+
+      // Load cached data button
+      document.getElementById('loadCachedBtn').onclick = function() {
+        if (!JX.loadCached("cachedData", "users-template", "#output")) {
+          alert("No cached data found!");
+        }
+      };
+
+      function clearCache() {
+        localStorage.removeItem("cachedData");
+        document.getElementById('output').innerHTML = "Cache cleared!";
+      }
+
+      function testLoop() {
+        const data = [
+          {name: 'Alice', email: 'alice@test.com', phone: '123-456', company: {name: 'Company A'}},
+          {name: 'Bob', email: 'bob@test.com', phone: '789-012', company: {name: 'Company B'}}
+        ];
+        JX.json('users-template', '#output', data);
+      }
+
+      window.addEventListener('DOMContentLoaded', function() {
+        JX.loadCached("cachedData", "users-template", "#output");
+      });
+    </script>
+  </body>
+</html>

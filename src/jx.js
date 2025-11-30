@@ -1,62 +1,50 @@
 class JX {
   constructor() {
     this.templates = new Map();
-  }
-
-  init() {
-    this.loadTemplates();
-    this.bindEvents();
-  }
-
-  loadTemplates() {
-    document.querySelectorAll('template[id]').forEach(template => {
-      this.templates.set(template.id, template);
+    document.querySelectorAll('template[id]').forEach(t => {
+      this.templates.set(t.id, t);
     });
-  }
 
-  bindEvents() {
     document.addEventListener('click', (e) => {
       const el = e.target.closest('[jx-get], [jx-post]');
-      if (!el) return;
-      e.preventDefault();
-      this.handleTrigger(el);
+      if (el) {
+        e.preventDefault();
+        this.handleTrigger(el);
+      }
     });
   }
 
-  async handleTrigger(element) {
-    const url = element.getAttribute('jx-get') || element.getAttribute('jx-post');
-    const method = element.hasAttribute('jx-post') ? 'POST' : 'GET';
+  async handleTrigger(el) {
+    const url = el.getAttribute('jx-get') || el.getAttribute('jx-post');
+    const method = el.hasAttribute('jx-post') ? 'POST' : 'GET';
+    const saveKey = el.getAttribute('jx-save');
 
-    const config = {
+    await this.render({
       url,
       method,
-      target: element.getAttribute('jx-target'),
-      template: element.getAttribute('jx-template')
-    };
-
-    await this.render(config);
+      target: el.getAttribute('jx-target'),
+      template: el.getAttribute('jx-template'),
+      save: saveKey
+    });
   }
 
-  async render({ url, method = 'GET', target, template: templateName }) {
-    const targetEl = document.querySelector(target);
-    const template = this.templates.get(templateName);
-
-    if (!targetEl || !template) {
-      console.error('JX: Missing target or template', { target, templateName });
-      return;
-    }
-
-    targetEl.innerHTML = '<div class="jx-loading">Loading...</div>';
+  async render(config) {
+    const targetEl = document.querySelector(config.target);
+    const template = this.templates.get(config.template);
+    if (!targetEl || !template) return;
 
     try {
-      const response = await fetch(url, { method });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
+      targetEl.innerHTML = 'Loading...';
+      const response = await fetch(config.url, { method: config.method });
       const data = await response.json();
-      this.renderTemplate(targetEl, template, data);
 
+      if (config.save) {
+        localStorage.setItem(config.save, JSON.stringify(data));
+      }
+
+      this.renderTemplate(targetEl, template, data);
     } catch (error) {
-      targetEl.innerHTML = `<div class="jx-error">Error: ${error.message}</div>`;
+      targetEl.innerHTML = `<div>Error: ${error.message}</div>`;
     }
   }
 
@@ -68,53 +56,45 @@ class JX {
   }
 
   interpolate(node, data) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      node.textContent = this.replacePlaceholders(node.textContent, data);
+    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('jx-each')) {
+      this.handleLoop(node, data);
       return;
     }
 
+    if (node.nodeType === Node.TEXT_NODE) {
+      node.textContent = node.textContent.replace(/\{\{([^}]+)\}\}/g,
+        (_, path) => this.get(data, path.trim()) ?? ''
+      );
+    }
+
     if (node.nodeType === Node.ELEMENT_NODE) {
-      // Handle attributes
       Array.from(node.attributes).forEach(attr => {
         if (attr.value.includes('{{')) {
-          node.setAttribute(attr.name, this.replacePlaceholders(attr.value, data));
+          node.setAttribute(attr.name,
+            attr.value.replace(/\{\{([^}]+)\}\}/g,
+              (_, path) => this.get(data, path.trim()) ?? ''
+            )
+          );
         }
       });
 
-      // Handle loops FIRST
-      if (node.hasAttribute('jx-each')) {
-        this.handleLoop(node, data);
+      if (node.hasAttribute('jx-if') && !this.get(data, node.getAttribute('jx-if'))) {
+        node.remove();
         return;
       }
-
-      // Handle conditionals
-      if (node.hasAttribute('jx-if')) {
-        if (!this.handleConditional(node, data)) {
-          return;
-        }
-      }
     }
 
-    // Process children
-    if (node.childNodes) {
-      Array.from(node.childNodes).forEach(child => {
-        this.interpolate(child, data);
-      });
+    if (!node.hasAttribute?.('jx-each')) {
+      node.childNodes?.forEach(child => this.interpolate(child, data));
     }
-  }
-
-  replacePlaceholders(text, data) {
-    return text.replace(/\{\{\s*([^}]+)\s*\}\}/g, (match, path) => {
-      const value = this.get(data, path.trim());
-      return value != null ? String(value) : '';
-    });
   }
 
   handleLoop(node, data) {
     const path = node.getAttribute('jx-each');
-    const array = this.get(data, path);
+    const array = path === '.' ? data : this.get(data, path);
 
     if (!Array.isArray(array)) {
+      console.warn('JX: jx-each data is not an array:', array);
       node.remove();
       return;
     }
@@ -123,30 +103,18 @@ class JX {
     const template = node.cloneNode(true);
     template.removeAttribute('jx-each');
 
-    const originalIndex = Array.from(parent.childNodes).indexOf(node);
-    if (originalIndex !== -1) {
-      parent.removeChild(node);
-    }
+    const nextSibling = node.nextSibling;
+    node.remove();
 
     array.forEach((item, index) => {
       const clone = template.cloneNode(true);
-      clone.setAttribute('data-index', index);
       this.interpolate(clone, item);
-      parent.insertBefore(clone, parent.childNodes[originalIndex + index]);
+      if (nextSibling) {
+        parent.insertBefore(clone, nextSibling);
+      } else {
+        parent.appendChild(clone);
+      }
     });
-  }
-
-  handleConditional(node, data) {
-    const condition = node.getAttribute('jx-if');
-    const value = this.get(data, condition);
-
-    if (!value) {
-      node.remove();
-      return false;
-    }
-
-    node.removeAttribute('jx-if');
-    return true;
   }
 
   get(obj, path) {
@@ -154,27 +122,49 @@ class JX {
     return path.split('.').reduce((o, key) => o?.[key], obj);
   }
 
-  async load(url, { target, template, method = 'GET' }) {
-    return this.render({ url, method, target, template });
-  }
+  static json(template, target, data) {
+    const templateEl = typeof template === 'string'
+      ? document.getElementById(template)
+      : template;
 
-  bind(selector, config) {
-    const element = document.querySelector(selector);
-    if (!element) {
-      console.error('JX: Bind target not found:', selector);
+    const targetEl = typeof target === 'string'
+      ? document.querySelector(target)
+      : target;
+
+    if (!templateEl || !targetEl) {
+      console.error('JX: Template or target not found');
       return;
     }
 
-    element.setAttribute('jx-get', config.url || '');
-    element.setAttribute('jx-target', config.target);
-    element.setAttribute('jx-template', config.template);
-    if (config.method === 'POST') {
-      element.setAttribute('jx-post', config.url || '');
-      element.removeAttribute('jx-get');
+    jx.renderTemplate(targetEl, templateEl, data);
+  }
+
+  static bind(selector, config) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+
+    el.setAttribute('jx-get', config.url);
+    el.setAttribute('jx-target', config.target);
+    el.setAttribute('jx-template', config.template);
+
+    if (config.save) {
+      el.setAttribute('jx-save', config.save);
     }
+
+    if (config.method === 'POST') {
+      el.setAttribute('jx-post', config.url);
+      el.removeAttribute('jx-get');
+    }
+  }
+
+  static loadCached(key, template, target) {
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      JX.json(template, target, JSON.parse(cached));
+      return true;
+    }
+    return false;
   }
 }
 
 const jx = new JX();
-jx.init();
-export default jx;
