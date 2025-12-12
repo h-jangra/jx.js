@@ -1,86 +1,108 @@
-# JX - JSON Template Library
+# JX
 
-Minimal JSON fetching + templating library. Like HTMX but simpler.
+A minimal library for fetching APIs and rendering data into templates, inspired by HTMX.
 
 ## Setup
 
+Include the script in your HTML:
+
 ```html
-<script type="module" src="./jx.js"></script>
+<script src="jx.js"></script>
 ```
 
-## HTML (Declarative)
+## Basic Usage
+
+### HTML Markup
 
 ```html
-<button jx-get="/api/users" jx-target="#list" jx-template="users">
-Load
+<button jx-get="/api/data" jx-template="item-template">
+  Load Data
 </button>
 
-<div id="list"></div>
-
-<template id="users">
-<ul>
-<li jx-each=".">{{ name }} - {{ email }}</li>
-</ul>
+<template id="item-template">
+  <h2>{{ title }}</h2>
+  <p>{{ description }}</p>
 </template>
 ```
 
-## JavaScript (Programmatic)
-
-```javascript
-import jx from './jx.js';
-
-// Method 1: Bind attributes
-jx.bind('#btn', {
-url: '/api/users',
-target: '#list',
-template: 'users'
-});
-
-// Method 2: Direct load
-jx.load('/api/users', {
-target: '#list',
-template: 'users'
-});
-```
+Click the button to fetch from `/api/data`, then render using the template. The template is replaced with the rendered content.
 
 ## Attributes
 
-| Attr | Use |
-|------|-----|
-| `jx-get` | GET request URL |
-| `jx-post` | POST request URL |
-| `jx-target` | CSS selector (where to render) |
-| `jx-template` | \<template\> id |
-| `jx-each` | Loop: `jx-each="items"` or `jx-each="."` |
-| `jx-if` | Show if truthy: `jx-if="premium"` |
+| Attribute | Description |
+|-----------|-------------|
+| `jx-get` | Fetch URL with GET request |
+| `jx-post` | Fetch URL with POST request |
+| `jx-template` | Template ID to use for rendering |
+| `jx-save` | localStorage key to cache the response |
+| `jx-each` | Loop over array: `jx-each="items"` |
+| `jx-if` | Conditionally show element: `jx-if="isActive"` |
 
-## Examples
+## Template Syntax
 
-### Loop
+Use `{{ path.to.data }}` to interpolate values:
+
 ```html
-<template jx-template="list">
-<li jx-each="items">{{ name }}</li>
+<template id="user-template">
+  <h2>{{ user.name }}</h2>
+  <p>Email: {{ user.email }}</p>
+  
+  <ul>
+    <li jx-each="items">{{ this.name }}</li>
+  </ul>
+  
+  <div jx-if="user.isAdmin">Admin only content</div>
 </template>
 ```
 
-### Conditional
-```html
-<p jx-if="admin">Admin only</p>
+## JavaScript API
+
+### `JX.json(template, data)`
+
+Render data directly without fetching:
+
+```javascript
+JX.json('user-template', { name: 'Alice', email: 'alice@example.com' });
 ```
 
-### Nested
-```html
-<p>By {{ author.name }}</p>
+### `JX.bind(selector, config)`
+
+Programmatically set up triggers:
+
+```javascript
+JX.bind('#load-btn', {
+  url: '/api/data',
+  template: 'item-template',
+  method: 'POST',
+  save: 'cached-data'
+});
 ```
 
-### Attributes
-```html
-<a href="/user/{{ id }}">{{ name }}</a>
+### `JX.loadCached(key, template)`
+
+Load previously cached data:
+
+```javascript
+JX.loadCached('cached-data', 'item-template');
 ```
 
-## Notes
+## Example
 
-- `{{ . }}` = current item (for arrays of primitives)
-    - `{{ prop.nested }}` = dot notation
-    - Falsy values fail `jx-if`
-    - Loading/error states use `.jx-loading` and `.jx-error` classes
+```html
+<button jx-get="/api/posts" jx-template="post-list" jx-save="posts-cache">
+  Load Posts
+</button>
+
+<template id="post-list">
+  <article jx-each=".">
+    <h3>{{ title }}</h3>
+    <p>{{ excerpt }}</p>
+    <small jx-if="featured">Featured</small>
+  </article>
+</template>
+
+<script>
+  // Load from cache if available, otherwise user clicks button
+  JX.loadCached('posts-cache', 'post-list');
+</script>
+```

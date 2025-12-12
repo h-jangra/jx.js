@@ -17,42 +17,46 @@ class JX {
   async handleTrigger(el) {
     const url = el.getAttribute('jx-get') || el.getAttribute('jx-post');
     const method = el.hasAttribute('jx-post') ? 'POST' : 'GET';
-    const saveKey = el.getAttribute('jx-save');
 
     await this.render({
       url,
       method,
-      target: el.getAttribute('jx-target'),
       template: el.getAttribute('jx-template'),
-      save: saveKey
+      save: el.getAttribute('jx-save')
     });
   }
 
   async render(config) {
-    const targetEl = document.querySelector(config.target);
     const template = this.templates.get(config.template);
-    if (!targetEl || !template) return;
+    if (!template) return;
 
     try {
-      targetEl.innerHTML = 'Loading...';
       const response = await fetch(config.url, { method: config.method });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
       const data = await response.json();
 
       if (config.save) {
         localStorage.setItem(config.save, JSON.stringify(data));
       }
 
-      this.renderTemplate(targetEl, template, data);
+      this.renderTemplate(template, data);
     } catch (error) {
-      targetEl.innerHTML = `<div>Error: ${error.message}</div>`;
+      this.renderError(template, error.message);
     }
   }
 
-  renderTemplate(target, template, data) {
+  renderTemplate(template, data) {
     const fragment = template.content.cloneNode(true);
     this.interpolate(fragment, data);
-    target.innerHTML = '';
-    target.appendChild(fragment);
+    template.replaceWith(fragment);
+  }
+
+  renderError(template, message) {
+    const error = document.createElement('div');
+    error.className = 'jx-error';
+    error.textContent = `Error: ${message}`;
+    template.replaceWith(error);
   }
 
   interpolate(node, data) {
@@ -106,7 +110,7 @@ class JX {
     const nextSibling = node.nextSibling;
     node.remove();
 
-    array.forEach((item, index) => {
+    array.forEach(item => {
       const clone = template.cloneNode(true);
       this.interpolate(clone, item);
       if (nextSibling) {
@@ -122,21 +126,17 @@ class JX {
     return path.split('.').reduce((o, key) => o?.[key], obj);
   }
 
-  static json(template, target, data) {
+  static json(template, data) {
     const templateEl = typeof template === 'string'
       ? document.getElementById(template)
       : template;
 
-    const targetEl = typeof target === 'string'
-      ? document.querySelector(target)
-      : target;
-
-    if (!templateEl || !targetEl) {
-      console.error('JX: Template or target not found');
+    if (!templateEl) {
+      console.error('JX: Template not found');
       return;
     }
 
-    jx.renderTemplate(targetEl, templateEl, data);
+    jx.renderTemplate(templateEl, data);
   }
 
   static bind(selector, config) {
@@ -144,7 +144,6 @@ class JX {
     if (!el) return;
 
     el.setAttribute('jx-get', config.url);
-    el.setAttribute('jx-target', config.target);
     el.setAttribute('jx-template', config.template);
 
     if (config.save) {
@@ -157,10 +156,10 @@ class JX {
     }
   }
 
-  static loadCached(key, template, target) {
+  static loadCached(key, template) {
     const cached = localStorage.getItem(key);
     if (cached) {
-      JX.json(template, target, JSON.parse(cached));
+      JX.json(template, JSON.parse(cached));
       return true;
     }
     return false;
