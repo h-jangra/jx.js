@@ -1,169 +1,155 @@
 class JX {
   constructor() {
-    this.templates = new Map();
-    document.querySelectorAll('template[id]').forEach(t => {
-      this.templates.set(t.id, t);
-    });
+    this.templates = new Map(
+      [...document.querySelectorAll("template[id]")].map(t => [t.id, t])
+    );
 
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[jx-get], [jx-post]');
+    document.addEventListener("click", e => {
+      const el = e.target.closest("[jx-get],[jx-post]");
       if (el) {
         e.preventDefault();
-        this.handleTrigger(el);
+        this.trigger(el);
       }
     });
   }
 
-  async handleTrigger(el) {
-    const url = el.getAttribute('jx-get') || el.getAttribute('jx-post');
-    const method = el.hasAttribute('jx-post') ? 'POST' : 'GET';
+  async trigger(el) {
+    const method = el.hasAttribute("jx-post") ? "POST" : "GET";
+    const url = el.getAttribute(`jx-${method.toLowerCase()}`);
 
     await this.render({
       url,
       method,
-      template: el.getAttribute('jx-template'),
-      save: el.getAttribute('jx-save')
+      template: el.getAttribute("jx-template"),
+      save: el.getAttribute("jx-save")
     });
   }
 
-  async render(config) {
-    const template = this.templates.get(config.template);
-    if (!template) return;
+  async render({ url, method, template, save }) {
+    const tpl = this.templates.get(template);
+    if (!tpl) return;
 
     try {
-      const response = await fetch(config.url, { method: config.method });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const res = await fetch(url, { method });
+      if (!res.ok) throw Error(res.status);
+      const data = await res.json();
 
-      const data = await response.json();
+      if (save) localStorage.setItem(save, JSON.stringify(data));
 
-      if (config.save) {
-        localStorage.setItem(config.save, JSON.stringify(data));
-      }
-
-      this.renderTemplate(template, data);
-    } catch (error) {
-      this.renderError(template, error.message);
+      this.renderTemplate(tpl, data);
+    } catch (e) {
+      this.renderError(tpl, e.message);
     }
   }
 
-  renderTemplate(template, data) {
-    const fragment = template.content.cloneNode(true);
-    this.interpolate(fragment, data);
-    template.replaceWith(fragment);
+  renderTemplate(tpl, data) {
+    const frag = tpl.content.cloneNode(true);
+    this.walk(frag, data);
+    tpl.replaceWith(frag);
   }
 
-  renderError(template, message) {
-    const error = document.createElement('div');
-    error.className = 'jx-error';
-    error.textContent = `Error: ${message}`;
-    template.replaceWith(error);
+  renderError(tpl, msg) {
+    const el = document.createElement("div");
+    el.className = "jx-error";
+    el.textContent = "Error: " + msg;
+    tpl.replaceWith(el);
   }
 
-  interpolate(node, data) {
-    if (node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('jx-each')) {
-      this.handleLoop(node, data);
+  walk(node, data) {
+    if (node.nodeType === 3) {
+      node.textContent = node.textContent.replace(/\{\{([^}]+)\}\}/g,
+        (_, p) => this.get(data, p.trim()) ?? ""
+      );
       return;
     }
 
-    if (node.nodeType === Node.TEXT_NODE) {
-      node.textContent = node.textContent.replace(/\{\{([^}]+)\}\}/g,
-        (_, path) => this.get(data, path.trim()) ?? ''
-      );
+    if (node.nodeType !== 1) {
+      node.childNodes.forEach(n => this.walk(n, data));
+      return;
     }
 
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      Array.from(node.attributes).forEach(attr => {
-        if (attr.value.includes('{{')) {
-          node.setAttribute(attr.name,
-            attr.value.replace(/\{\{([^}]+)\}\}/g,
-              (_, path) => this.get(data, path.trim()) ?? ''
-            )
-          );
-        }
-      });
-
-      if (node.hasAttribute('jx-if') && !this.get(data, node.getAttribute('jx-if'))) {
-        node.remove();
-        return;
-      }
+    if (node.hasAttribute("jx-each")) {
+      this.each(node, data);
+      return;
     }
 
-    if (!node.hasAttribute?.('jx-each')) {
-      node.childNodes?.forEach(child => this.interpolate(child, data));
-    }
-  }
-
-  handleLoop(node, data) {
-    const path = node.getAttribute('jx-each');
-    const array = path === '.' ? data : this.get(data, path);
-
-    if (!Array.isArray(array)) {
-      console.warn('JX: jx-each data is not an array:', array);
+    if (node.hasAttribute("jx-if") && !this.get(data, node.getAttribute("jx-if"))) {
       node.remove();
       return;
     }
 
-    const parent = node.parentNode;
-    const template = node.cloneNode(true);
-    template.removeAttribute('jx-each');
+    [...node.attributes].forEach(a => {
+      if (a.value.includes("{{")) {
+        node.setAttribute(
+          a.name,
+          a.value.replace(/\{\{([^}]+)\}\}/g,
+            (_, p) => this.get(data, p.trim()) ?? ""
+          )
+        );
+      }
+    });
 
-    const nextSibling = node.nextSibling;
+    node.childNodes.forEach(n => this.walk(n, data));
+  }
+
+  each(node, data) {
+    const arr = this.get(data, node.getAttribute("jx-each")) ?? data;
+    if (!Array.isArray(arr)) { node.remove(); return; }
+
+    const tpl = node.cloneNode(true);
+    tpl.removeAttribute("jx-each");
+    const parent = node.parentNode;
+    const next = node.nextSibling;
     node.remove();
 
-    array.forEach(item => {
-      const clone = template.cloneNode(true);
-      this.interpolate(clone, item);
-      if (nextSibling) {
-        parent.insertBefore(clone, nextSibling);
-      } else {
-        parent.appendChild(clone);
-      }
+    arr.forEach(item => {
+      const c = tpl.cloneNode(true);
+      this.walk(c, item);
+      next ? parent.insertBefore(c, next) : parent.appendChild(c);
     });
   }
 
-  get(obj, path) {
-    if (path === '.' || path === 'this') return obj;
-    return path.split('.').reduce((o, key) => o?.[key], obj);
+  get(o, path) {
+    if (path === "." || path === "this") return o;
+    return path.split(".").reduce((x, k) => x?.[k], o);
   }
 
-  static json(template, data) {
-    const templateEl = typeof template === 'string'
-      ? document.getElementById(template)
-      : template;
-
-    if (!templateEl) {
-      console.error('JX: Template not found');
-      return;
-    }
-
-    jx.renderTemplate(templateEl, data);
+  static json(tpl, data) {
+    const el = typeof tpl === "string" ? document.getElementById(tpl) : tpl;
+    if (el) jx.renderTemplate(el, data);
   }
 
   static bind(selector, config) {
     const el = document.querySelector(selector);
     if (!el) return;
 
-    el.setAttribute('jx-get', config.url);
-    el.setAttribute('jx-template', config.template);
-
-    if (config.save) {
-      el.setAttribute('jx-save', config.save);
+    if (config.data) {
+      el.addEventListener("click", e => {
+        e.preventDefault();
+        const tpl = jx.templates.get(config.template);
+        if (tpl) jx.renderTemplate(tpl, config.data);
+      });
+      return;
     }
 
-    if (config.method === 'POST') {
-      el.setAttribute('jx-post', config.url);
-      el.removeAttribute('jx-get');
-    }
+    const m = config.method === "POST" ? "post" : "get";
+    el.setAttribute(`jx-${m}`, config.url);
+    el.setAttribute("jx-template", config.template);
+    if (config.save) el.setAttribute("jx-save", config.save);
   }
 
-  static loadCached(key, template) {
-    const cached = localStorage.getItem(key);
-    if (cached) {
-      JX.json(template, JSON.parse(cached));
-      return true;
-    }
-    return false;
+  static loadCached(key, tpl) {
+    const c = localStorage.getItem(key);
+    if (!c) return false;
+    JX.json(tpl, JSON.parse(c));
+    return true;
+  }
+
+  static load(selector, cfg) {
+    JX.bind(selector, cfg);
+    jx.trigger(document.querySelector(selector));
   }
 }
 
 const jx = new JX();
+

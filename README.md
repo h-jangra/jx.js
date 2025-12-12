@@ -1,108 +1,147 @@
-# JX
+# JX — Minimal JSON → Template Renderer
 
-A minimal library for fetching APIs and rendering data into templates, inspired by HTMX.
+**JX** is a tiny declarative templating helper for HTML.
+It binds elements to URLs using `jx-get` / `jx-post`, fetches JSON, and renders it into native `<template>` elements with `{{ bindings }}`, loops, conditionals, and optional caching.
 
-## Setup
+No build tools. No dependencies. Just drop it in.
 
-Include the script in your HTML:
+---
+
+## Features
+
+* Use `<template>` with `{{ variable }}` bindings
+* Auto-fetch on click via `jx-get` / `jx-post`
+* Loops with `jx-each="items"`
+* Conditionals with `jx-if="condition"`
+* Attribute interpolation (`src="{{ url }}"`)
+* Optional localStorage caching (`jx-save="key"`)
+* Minimal API for manual loading
+
+---
+
+## Basic Usage
+
+### 1. Add a Template
+
+```html
+<template id="user-template">
+  <div>
+    <h3>{{ name }}</h3>
+    <p>{{ email }}</p>
+  </div>
+</template>
+```
+
+### 2. Add a Trigger
+
+```html
+<button jx-get="/api/user" jx-template="user-template">
+  Load User
+</button>
+```
+
+### 3. Include JX
 
 ```html
 <script src="jx.js"></script>
 ```
 
-## Basic Usage
+Clicking the button fetches JSON and replaces the `<template>` with rendered HTML.
 
-### HTML Markup
+---
 
-```html
-<button jx-get="/api/data" jx-template="item-template">
-  Load Data
-</button>
-
-<template id="item-template">
-  <h2>{{ title }}</h2>
-  <p>{{ description }}</p>
-</template>
-```
-
-Click the button to fetch from `/api/data`, then render using the template. The template is replaced with the rendered content.
-
-## Attributes
-
-| Attribute | Description |
-|-----------|-------------|
-| `jx-get` | Fetch URL with GET request |
-| `jx-post` | Fetch URL with POST request |
-| `jx-template` | Template ID to use for rendering |
-| `jx-save` | localStorage key to cache the response |
-| `jx-each` | Loop over array: `jx-each="items"` |
-| `jx-if` | Conditionally show element: `jx-if="isActive"` |
-
-## Template Syntax
-
-Use `{{ path.to.data }}` to interpolate values:
+## Looping
 
 ```html
-<template id="user-template">
-  <h2>{{ user.name }}</h2>
-  <p>Email: {{ user.email }}</p>
-  
+<template id="list">
   <ul>
-    <li jx-each="items">{{ this.name }}</li>
+    <li jx-each="items">{{ name }}</li>
   </ul>
-  
-  <div jx-if="user.isAdmin">Admin only content</div>
 </template>
 ```
 
-## JavaScript API
+---
 
-### `JX.json(template, data)`
+## Conditionals
 
-Render data directly without fetching:
-
-```javascript
-JX.json('user-template', { name: 'Alice', email: 'alice@example.com' });
+```html
+<div jx-if="isAdmin">Admin Panel</div>
 ```
 
-### `JX.bind(selector, config)`
+---
 
-Programmatically set up triggers:
+## Saving + Loading Cached Data
 
-```javascript
-JX.bind('#load-btn', {
-  url: '/api/data',
-  template: 'item-template',
-  method: 'POST',
-  save: 'cached-data'
+```html
+<button
+  jx-get="/api/dashboard"
+  jx-template="dash"
+  jx-save="dashboard-cache">
+  Load Dashboard
+</button>
+```
+
+Load from cache manually:
+
+```js
+JX.loadCached("dashboard-cache", "dash");
+```
+
+---
+
+## Programmatic Binding
+
+```js
+JX.bind("#btn", {
+  url: "/api/profile",
+  template: "profile",
+  method: "GET",
+  save: "profile-cache"
 });
 ```
 
-### `JX.loadCached(key, template)`
+Trigger immediately:
 
-Load previously cached data:
-
-```javascript
-JX.loadCached('cached-data', 'item-template');
+```js
+JX.load("#btn", {
+  url: "/api/profile",
+  template: "profile"
+});
 ```
 
-## Example
+---
 
-```html
-<button jx-get="/api/posts" jx-template="post-list" jx-save="posts-cache">
-  Load Posts
-</button>
+## Manual Rendering
 
-<template id="post-list">
-  <article jx-each=".">
-    <h3>{{ title }}</h3>
-    <p>{{ excerpt }}</p>
-    <small jx-if="featured">Featured</small>
-  </article>
-</template>
-
-<script>
-  // Load from cache if available, otherwise user clicks button
-  JX.loadCached('posts-cache', 'post-list');
-</script>
+```js
+JX.json("user-template", { name: "Ava", email: "a@example.com" });
 ```
+
+---
+
+## Attributes Reference
+
+| Attribute     | Purpose                    |
+| ------------- | -------------------------- |
+| `jx-get`      | Fetch with GET             |
+| `jx-post`     | Fetch with POST            |
+| `jx-template` | Template ID to render      |
+| `jx-save`     | Saves JSON to localStorage |
+| `jx-each`     | Loop over an array         |
+| `jx-if`       | Conditional rendering      |
+
+---
+
+## Example JSON
+
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "items": [
+    { "name": "Item A" },
+    { "name": "Item B" }
+  ]
+}
+```
+

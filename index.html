@@ -1,79 +1,98 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>JX Test</title>
+    <meta charset="UTF-8" />
+    <title>JX Demo</title>
+    <script src="./src/jx.js" defer></script>
   </head>
+
   <body>
-    <template id="user-template">
-      <div style="border:1px solid #ccc; padding:10px; margin:5px;">
-        <h3>{{name}}</h3>
-        <p>Age: {{age}}, Email: {{email}}</p>
+
+    <h2>JX Demo</h2>
+
+    <button jx-get="https://jsonplaceholder.typicode.com/users/1" jx-template="user">
+      Load User
+    </button>
+
+    <template id="user">
+      <div>
+        <h3>{{ name }}</h3>
+        <p>Email: {{ email }}</p>
+        <p jx-if="address.city">City: {{ address.city }}</p>
       </div>
     </template>
 
-    <template id="users-template">
-      <div jx-each="." style="border:1px solid blue; padding:10px; margin:5px;">
-        <h4>{{name}}</h4>
-        <p>Email: {{email}}, Phone: {{phone}}</p>
-        <p>Company: {{company.name}}</p>
+    <button jx-get="https://jsonplaceholder.typicode.com/posts?userId=1" jx-template="posts">
+      Load Posts
+    </button>
+
+    <template id="posts">
+      <ul>
+        <li jx-each=".">
+          <strong>{{ id }}</strong> — {{ title }}
+        </li>
+      </ul>
+    </template>
+
+    <button jx-get="https://jsonplaceholder.typicode.com/photos/1" jx-template="photo">
+      Load Photo
+    </button>
+
+    <template id="photo">
+      <div>
+        <img src="{{ thumbnailUrl }}" alt="{{ title }}">
+        <p>{{ title }}</p>
       </div>
     </template>
 
-    <button onclick="JX.json('user-template', '#output', {name: 'John', age: 25, email: 'john@test.com'})">
-      Test Single Item
+    <button jx-get="https://jsonplaceholder.typicode.com/todos/1" jx-template="todo" jx-save="todo-cache">
+      Load + Save Todo
     </button>
 
-    <button id="loadBtn">
-      Test API Fetch (Array)
+    <button onclick="JX.loadCached('todo-cache','todo')">
+      Load Cached Todo
     </button>
 
-    <button id="loadCachedBtn">
-      Load Cached Data
-    </button>
+    <template id="todo">
+      <div>
+        <h4>{{ title }}</h4>
+        <p>Completed: {{ completed }}</p>
+      </div>
+    </template>
 
-    <button onclick="clearCache()">
-      Clear Cache
-    </button>
+    <button id="auto">Auto Load User 2</button>
 
-    <button onclick="testLoop()">
-      Test Loop with Static Data
-    </button>
+    <template id="user2">
+      <div>
+        <h3>{{ name }}</h3>
+        <p>{{ email }}</p>
+      </div>
+    </template>
 
-    <div id="output" style="margin-top:20px; padding:10px; border:1px dashed #999;"></div>
+    <button id="json">Load json</button>
+    <template id="mini">
+      <p>{{ title }}</p>
+    </template>
 
-    <script src="src/jx.js"></script>
     <script>
-      // Bind the load button with save functionality
-      JX.bind("#loadBtn", {
-        url: "https://jsonplaceholder.typicode.com/users",
-        target: "#output",
-        template: "users-template",
-        save: "cachedData"  // This will save to localStorage
-      });
+      document.addEventListener("DOMContentLoaded", () => {
+        JX.bind("#json", {
+          data:{title:"From json"},
+          template: "mini"
+        });
 
-      // Load cached data button
-      document.getElementById('loadCachedBtn').onclick = function() {
-        if (!JX.loadCached("cachedData", "users-template", "#output")) {
-          alert("No cached data found!");
-        }
-      };
+        JX.bind("#auto", {
+          url: "https://jsonplaceholder.typicode.com/users/2",
+          template: "user2"
+        });
 
-      function clearCache() {
-        localStorage.removeItem("cachedData");
-        document.getElementById('output').innerHTML = "Cache cleared!";
-      }
-
-      function testLoop() {
-        const data = [
-          {name: 'Alice', email: 'alice@test.com', phone: '123-456', company: {name: 'Company A'}},
-          {name: 'Bob', email: 'bob@test.com', phone: '789-012', company: {name: 'Company B'}}
-        ];
-        JX.json('users-template', '#output', data);
-      }
-
-      window.addEventListener('DOMContentLoaded', function() {
-        JX.loadCached("cachedData", "users-template", "#output");
+        JX.load("#auto", {
+          url: "https://jsonplaceholder.typicode.com/users/2",
+          template: "user2"
+        });
       });
     </script>
+
   </body>
 </html>
+
